@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="ThoxWebby - In-browser THOX assistant, WebGPU">
+  <title>ThoxWebby - In-browser THOX assistant</title>
+  <defs>
+    <radialGradient id="glow" cx="20%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.14"/>
+      <stop offset="60%" stop-color="#00ff88" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#09090b" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dotgrid" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="1" fill="#27272a"/>
+    </pattern>
+  </defs>
+
+  <!-- background -->
+  <rect width="1200" height="630" fill="#09090b"/>
+  <rect width="1200" height="630" fill="url(#dotgrid)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- top bar -->
+  <line x1="0" y1="60" x2="1200" y2="60" stroke="#27272a" stroke-width="1"/>
+  <text x="72" y="42" font-family="JetBrains Mono, monospace" font-size="14" font-weight="500" fill="#a1a1aa" letter-spacing="2">
+    THOX.AI  ::  THOXWEBBY  ::  v0.1
+  </text>
+  <circle cx="1128" cy="34" r="4" fill="#00ff88"/>
+  <text x="1140" y="42" font-family="JetBrains Mono, monospace" font-size="12" fill="#71717a" letter-spacing="2">READY</text>
+
+  <!-- glyph -->
+  <g transform="translate(72, 180)">
+    <g fill="none" stroke="#fafafa" stroke-width="10" stroke-linecap="square">
+      <line x1="8" y1="16" x2="88" y2="96"/>
+      <line x1="88" y1="16" x2="8" y2="96"/>
+    </g>
+    <circle cx="84" cy="10" r="7" fill="#00ff88"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="72" y="376" font-family="JetBrains Mono, monospace" font-size="104" font-weight="700" fill="#fafafa" letter-spacing="-2">ThoxWebby</text>
+  <line x1="72" y1="404" x2="220" y2="404" stroke="#00ff88" stroke-width="3"/>
+
+  <!-- tagline -->
+  <text x="72" y="454" font-family="Inter, sans-serif" font-size="30" font-weight="400" fill="#a1a1aa">In-browser THOX assistant, WebGPU-native.</text>
+  <text x="72" y="494" font-family="Inter, sans-serif" font-size="24" font-weight="400" fill="#71717a">No servers. No telemetry. Local-first.</text>
+
+  <!-- footer -->
+  <line x1="0" y1="570" x2="1200" y2="570" stroke="#27272a" stroke-width="1"/>
+  <text x="72" y="606" font-family="JetBrains Mono, monospace" font-size="14" font-weight="500" fill="#a1a1aa" letter-spacing="2">
+    Your AI  ·  Your Data  ·  Your Rules
+  </text>
+  <text x="1128" y="606" font-family="JetBrains Mono, monospace" font-size="14" font-weight="500" fill="#71717a" letter-spacing="2" text-anchor="end">
+    thox.ai
+  </text>
+</svg>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80" role="img" aria-label="THOX glyph">
+  <title>THOX</title>
+  <desc>Stylized X mark with neon dot accent. THOX brand glyph on dark background.</desc>
+  <rect width="80" height="80" rx="14" fill="#09090b"/>
+  <g fill="none" stroke="#00ff88" stroke-width="8" stroke-linecap="square">
+    <line x1="14" y1="22" x2="66" y2="74"/>
+    <line x1="66" y1="22" x2="14" y2="74"/>
+  </g>
+  <circle cx="62" cy="14" r="5" fill="#10b981"/>
+</svg>
