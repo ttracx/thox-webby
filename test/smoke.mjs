@@ -5,9 +5,14 @@
 // run) so the test does NOT depend on the CI runner having a real WebGPU stack -
 // it asserts how OUR code reacts to each adapter outcome.
 //
-//   A0) navigator.gpu absent                 -> banner ON,  reason=no-webgpu-api
-//   A1) navigator.gpu.requestAdapter() -> null -> banner ON,  reason=no-adapter
+//   A0) navigator.gpu absent                     -> banner ON,  reason=no-webgpu-api
+//   A1) navigator.gpu.requestAdapter() -> null   -> banner ON,  reason=no-adapter
+//   A2) navigator.gpu.requestAdapter() -> throws -> banner ON,  reason=error
 //   B ) navigator.gpu.requestAdapter() -> adapter -> banner OFF (no regression)
+//
+// Every banner-ON pass also asserts the user-facing content of the banner
+// (title, pitch, browser checklist, chrome://gpu hint) so CI catches
+// regressions in the messaging, not just the visibility toggle.
 //
 // Run locally:  npm test
 // Run in CI:    .github/workflows/webgpu-banner-smoke.yml
@@ -73,6 +78,9 @@ async function probe(page) {
       bannerExists: !!banner,
       bannerHidden: banner ? banner.hidden : null,
       bannerDisplay: cs ? cs.display : null,
+      bannerText: banner ? banner.textContent : "",
+      bannerRole: banner ? banner.getAttribute("role") : null,
+      bannerAriaLive: banner ? banner.getAttribute("aria-live") : null,
       reason: reason ? reason.textContent : null,
       textareaDisabled: input ? input.disabled : null,
       textareaPlaceholder: input ? input.placeholder : null,
@@ -95,6 +103,24 @@ function assert(name, cond, detail) {
     console.error("  FAIL - " + name + (detail ? " :: " + detail : ""));
     failures++;
   }
+}
+
+// Assert the user-facing content of the banner is present. Called from every
+// banner-ON scenario (A0/A1/A2) so CI catches copy/checklist regressions, not
+// just the visibility toggle.
+function assertBannerContent(i) {
+  const t = i.bannerText || "";
+  const preview = JSON.stringify(t.replace(/\s+/g, " ").slice(0, 160));
+  assert("banner header 'WebGPU not available' present", t.includes("WebGPU not available"), "text=" + preview);
+  assert("banner pitch 'runs entirely' present", t.includes("runs entirely"), "text=" + preview);
+  assert("banner checklist Chrome present", t.includes("Chrome 113") || t.includes("Chrome"), "text=" + preview);
+  assert("banner checklist Edge present", t.includes("Edge"), "text=" + preview);
+  assert("banner checklist chrome://gpu hint present", t.includes("chrome://gpu"), "text=" + preview);
+  // A11y: role='status' + aria-live='polite' is the correct semantic for
+  // non-time-critical guidance (role='alert' would force assertive delivery,
+  // conflicting with the polite live region).
+  assert("banner role='status'", i.bannerRole === "status", "role=" + i.bannerRole);
+  assert("banner aria-live='polite'", i.bannerAriaLive === "polite", "aria-live=" + i.bannerAriaLive);
 }
 
 async function runPass(label, initScript, assertFn) {
@@ -135,6 +161,7 @@ async function runPass(label, initScript, assertFn) {
         assert("placeholder actionable", /WebGPU is not available/.test(i.textareaPlaceholder || ""), "placeholder=" + i.textareaPlaceholder);
         assert("status error set", /WebGPU|adapter/i.test(i.statusText || ""), "status=" + i.statusText);
         assert("body background #09090b", i.bodyBg === "rgb(9, 9, 11)", "bg=" + i.bodyBg);
+        assertBannerContent(i);
       }
     );
 
@@ -155,6 +182,33 @@ async function runPass(label, initScript, assertFn) {
         assert("headLoadBtn disabled", i.headLoadBtnDisabled === true, "disabled=" + i.headLoadBtnDisabled);
         assert("placeholder actionable", /WebGPU is not available/.test(i.textareaPlaceholder || ""), "placeholder=" + i.textareaPlaceholder);
         assert("body background #09090b", i.bodyBg === "rgb(9, 9, 11)", "bg=" + i.bodyBg);
+        assertBannerContent(i);
+      }
+    );
+
+    // A2: navigator.gpu present but requestAdapter() throws -> error branch.
+    // Closes G1: the "adapter query blew up" path was previously untested even
+    // though checkWebGPU() wraps requestAdapter() in try/catch and surfaces
+    // reason="error".
+    await runPass(
+      "Pass A2: requestAdapter() throws -> banner ON, reason=error",
+      () => {
+        Object.defineProperty(navigator, "gpu", {
+          configurable: true,
+          value: {
+            requestAdapter: () => Promise.reject(new Error("WebGPU adapter query failed")),
+          },
+        });
+      },
+      (i) => {
+        assert("#webgpuBanner[hidden] === false (toggled ON)", i.bannerHidden === false, "hidden=" + i.bannerHidden);
+        assert("banner computed display: block", i.bannerDisplay === "block", "display=" + i.bannerDisplay);
+        assert("reason chip error", i.reason === "error", "reason=" + i.reason);
+        assert("loadBtn disabled", i.loadBtnDisabled === true, "disabled=" + i.loadBtnDisabled);
+        assert("headLoadBtn disabled", i.headLoadBtnDisabled === true, "disabled=" + i.headLoadBtnDisabled);
+        assert("placeholder mentions WebGPU", /WebGPU/.test(i.textareaPlaceholder || ""), "placeholder=" + i.textareaPlaceholder);
+        assert("body background #09090b", i.bodyBg === "rgb(9, 9, 11)", "bg=" + i.bodyBg);
+        assertBannerContent(i);
       }
     );
 
@@ -180,6 +234,10 @@ async function runPass(label, initScript, assertFn) {
         assert("placeholder original", i.textareaPlaceholder === "Load the model to start chatting...", "placeholder=" + i.textareaPlaceholder);
         assert("status not error", /WebGPU|adapter/i.test(i.statusText || "") === false, "status=" + i.statusText);
         assert("body background #09090b", i.bodyBg === "rgb(9, 9, 11)", "bg=" + i.bodyBg);
+        // R1 a11y: even when banner is hidden the semantic markup must remain
+        // role='status' + aria-live='polite'.
+        assert("banner role='status'", i.bannerRole === "status", "role=" + i.bannerRole);
+        assert("banner aria-live='polite'", i.bannerAriaLive === "polite", "aria-live=" + i.bannerAriaLive);
       }
     );
   } finally {
