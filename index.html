@@ -1111,7 +1111,7 @@
           </div>
           <div class="hero-side">
             <div class="hero-actions">
-              <button class="btn-primary" id="loadBtn" type="button">
+              <button class="btn-primary" id="loadBtn" type="button" disabled data-webgpu-gated="true" aria-disabled="true">
                 <span id="loadBtnLabel">Load model</span>
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v9M4 7l4 4 4-4"/></svg>
               </button>
@@ -1145,7 +1145,7 @@
           <span class="status-text" id="statusText">Not loaded</span>
         </div>
         <div class="chat-head-actions">
-          <button class="head-btn solid" id="headLoadBtn" type="button">Load model</button>
+          <button class="head-btn solid" id="headLoadBtn" type="button" disabled data-webgpu-gated="true" aria-disabled="true">Load model</button>
           <button class="head-btn" id="kernelsBtn" type="button" hidden>View Kernels</button>
           <button class="head-btn" id="clearBtn" type="button" disabled>Clear</button>
         </div>
@@ -1312,6 +1312,13 @@
     let abortController = null;
     let isGenerating = false;
     let isLoading = false;
+    // Flip true only after checkWebGPU() confirms a usable adapter. Guards
+    // loadModel() against clicks that land during the async adapter probe.
+    // Before this flag existed, the Load buttons were enabled at paint and
+    // a no-WebGPU click during the window between paint and requestAdapter()
+    // resolution fell into loadModel()'s catch path with an ugly "Failed to
+    // load" toast instead of the graceful banner. See R2 / PR review.
+    let webgpuReady = false;
     let renderScheduled = false;
     let renderState = null;
     let targetProgress = 0; // latest monotonic load fraction [0,1]
@@ -1367,7 +1374,24 @@
       }
     }
 
-    checkWebGPU();
+    // Kick off the WebGPU probe. Load buttons ship HTML-disabled with
+    // data-webgpu-gated so no click can slip through before the promise
+    // resolves; the gate below removes the attribute + re-enables the
+    // buttons only when a usable adapter is confirmed.
+    async function initWebGPUGate() {
+      const available = await checkWebGPU();
+      if (available) {
+        webgpuReady = true;
+        document.querySelectorAll('[data-webgpu-gated]').forEach((el) => {
+          el.removeAttribute('data-webgpu-gated');
+          el.removeAttribute('aria-disabled');
+          el.disabled = false;
+        });
+      }
+      // If unavailable: showWebGPUUnavailable() already disabled the buttons
+      // and surfaced the banner; leave data-webgpu-gated in place as a marker.
+    }
+    initWebGPUGate();
 
     loadBtn.addEventListener("click", loadModel);
     headLoadBtn.addEventListener("click", loadModel);
@@ -1399,6 +1423,15 @@
 
     async function loadModel() {
       if (model || isLoading) return;
+      // Race guard: buttons ship disabled via data-webgpu-gated, but a very
+      // fast pre-paint click (or a forced click in tests) could still land
+      // before initWebGPUGate() flips webgpuReady. Without this early return
+      // we would fall into Gemma4Mobile.load() and surface a bare
+      // "Failed to load" toast instead of the graceful banner.
+      if (!webgpuReady) {
+        setStatus("loading", "Checking WebGPU support" + String.fromCharCode(0x2026));
+        return;
+      }
       isLoading = true;
       loadBtn.disabled = true;
       headLoadBtn.disabled = true;

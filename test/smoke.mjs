@@ -8,6 +8,7 @@
 //   A0) navigator.gpu absent                     -> banner ON,  reason=no-webgpu-api
 //   A1) navigator.gpu.requestAdapter() -> null   -> banner ON,  reason=no-adapter
 //   A2) navigator.gpu.requestAdapter() -> throws -> banner ON,  reason=error
+//   A3) forced click during checkWebGPU()   -> banner ON, no "Failed to load" toast
 //   B ) navigator.gpu.requestAdapter() -> adapter -> banner OFF (no regression)
 //
 // Every banner-ON pass also asserts the user-facing content of the banner
@@ -240,6 +241,55 @@ async function runPass(label, initScript, assertFn) {
         assert("banner aria-live='polite'", i.bannerAriaLive === "polite", "aria-live=" + i.bannerAriaLive);
       }
     );
+
+    // A3: race regression - click Load *during* the async WebGPU probe.
+    //
+    // Guards R2 from the PR #3/#4/#5 review: before this fix, the Load
+    // buttons were enabled at paint and checkWebGPU() was fire-and-forget,
+    // so a no-WebGPU click landing between paint and requestAdapter()
+    // resolution fell into loadModel()'s catch path and surfaced
+    // "Failed to load" instead of the graceful banner. We now ship the
+    // buttons disabled with data-webgpu-gated and guard loadModel() with
+    // a webgpuReady flag.
+    //
+    // This pass delays requestAdapter() so the race window is wide, then
+    // force-clicks both Load buttons before the promise resolves. The pass
+    // asserts the banner is on, buttons stayed disabled, and the status
+    // never says "Failed to load".
+    console.log('Pass A3: forced click during checkWebGPU() -> banner ON, no \"Failed to load\" toast');
+    {
+      const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
+      try {
+        const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+        await ctx.addInitScript(() => {
+          if (!navigator.gpu) {
+            Object.defineProperty(navigator, 'gpu', { value: {}, configurable: true });
+          }
+          // Widen the race window so the click reliably lands while the
+          // adapter promise is still pending.
+          navigator.gpu.requestAdapter = async () => {
+            await new Promise((r) => setTimeout(r, 400));
+            return null;
+          };
+        });
+        const page = await ctx.newPage();
+        await page.goto(URL, { waitUntil: 'load', timeout: 30000 });
+        // Force clicks that bypass the disabled attribute, simulating a
+        // client-side dispatch that races the pending adapter probe.
+        await page.click('#loadBtn', { force: true, timeout: 1000 }).catch(() => {});
+        await page.click('#headLoadBtn', { force: true, timeout: 1000 }).catch(() => {});
+        // Let the delayed requestAdapter() resolve and the banner render.
+        await page.waitForTimeout(1500);
+        const i = await probe(page);
+        assert('A3 banner ON', i.bannerHidden === false, 'hidden=' + i.bannerHidden);
+        assert('A3 reason no-adapter', i.reason === 'no-adapter', 'reason=' + i.reason);
+        assert('A3 loadBtn stayed disabled', i.loadBtnDisabled === true, 'disabled=' + i.loadBtnDisabled);
+        assert('A3 headLoadBtn stayed disabled', i.headLoadBtnDisabled === true, 'disabled=' + i.headLoadBtnDisabled);
+        assert('A3 no \"Failed to load\" toast', !/Failed to load/i.test(i.statusText || ''), 'status=' + i.statusText);
+      } finally {
+        await browser.close();
+      }
+    }
   } finally {
     srv.close();
   }
