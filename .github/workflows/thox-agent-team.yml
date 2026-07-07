@@ -1,0 +1,91 @@
+name: THOX Agent Team Review
+
+on:
+  issues:
+    types: [opened, edited, reopened, labeled]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  schedule:
+    - cron: '17 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  checks: read
+  actions: read
+
+concurrency:
+  group: thox-agent-team-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  agent-triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const items = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
+            const prs = items.filter(item => item.pull_request);
+            const issues = items.filter(item => !item.pull_request);
+            core.summary.addHeading('THOX Agent Team Review').addRaw(`Open issues: ${issues.length}\n\nOpen PRs: ${prs.length}\n\n`).write();
+            for (const issue of issues.slice(0, 30)) {
+              const labels = issue.labels.map(l => typeof l === 'string' ? l : l.name);
+              if (!labels.includes('thox-agent-reviewed')) {
+                await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: ['thox-agent-reviewed'] });
+                await github.rest.issues.createComment({ owner, repo, issue_number: issue.number, body: `THOX agent-team queued this issue for Architecture, Implementation, QA, and Merge Steward review.\n\nRun: ${runUrl}` });
+              }
+            }
+
+  pr-safety-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = context.payload.pull_request.number;
+            const pr = context.payload.pull_request;
+            const files = await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number, per_page: 100 });
+            const risky = files.filter(f => /(^|\/)(secrets?|\.env|keys?|credentials?|prod|production)(\/|$|\.)/i.test(f.filename));
+            const tooLarge = files.length > 60 || files.some(f => f.changes > 1200);
+            let body = `THOX PR safety review complete.\n\nChanged files: ${files.length}\nRisk flags: ${risky.length}\nLarge change: ${tooLarge ? 'yes' : 'no'}`;
+            if (risky.length || tooLarge || pr.draft) {
+              body += '\n\nMerge Steward status: blocked for human review before merge.';
+              core.setFailed('PR requires human review before automated merge.');
+            } else {
+              body += '\n\nMerge Steward status: eligible after required checks pass.';
+            }
+            await github.rest.issues.createComment({ owner, repo, issue_number: pull_number, body });
+
+  prune-merged-branches:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const repository = await github.rest.repos.get({ owner, repo });
+            const defaultBranch = repository.data.default_branch;
+            const branches = await github.paginate(github.rest.repos.listBranches, { owner, repo, per_page: 100 });
+            let deleted = [];
+            for (const branch of branches) {
+              if (branch.name === defaultBranch || branch.protected) continue;
+              const compare = await github.rest.repos.compareCommitsWithBasehead({ owner, repo, basehead: `${defaultBranch}...${branch.name}` }).catch(() => null);
+              if (compare && compare.data.status === 'behind') {
+                await github.rest.git.deleteRef({ owner, repo, ref: `heads/${branch.name}` }).catch(() => null);
+                deleted.push(branch.name);
+              }
+            }
+            core.summary.addHeading('Merged branch pruning').addRaw(`Deleted branches: ${deleted.join(', ') || 'none'}\n`).write();
