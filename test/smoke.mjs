@@ -1,10 +1,13 @@
 // ThoxWebby WebGPU-banner smoke test.
 // Checked-in regression guard for the graceful WebGPU-unavailable banner.
 //
-// Two passes against a locally served copy of the static site:
-//   A) headless, real (absent) adapter  -> banner MUST toggle ON  (#webgpuBanner[hidden] === false)
-//   B) stubbed working adapter          -> banner MUST toggle OFF (#webgpuBanner[hidden] === true)
-//                                           and the existing load flow must be reachable (no regression).
+// All passes use deterministic navigator.gpu stubs (injected before page scripts
+// run) so the test does NOT depend on the CI runner having a real WebGPU stack -
+// it asserts how OUR code reacts to each adapter outcome.
+//
+//   A0) navigator.gpu absent                 -> banner ON,  reason=no-webgpu-api
+//   A1) navigator.gpu.requestAdapter() -> null -> banner ON,  reason=no-adapter
+//   B ) navigator.gpu.requestAdapter() -> adapter -> banner OFF (no regression)
 //
 // Run locally:  npm test
 // Run in CI:    .github/workflows/webgpu-banner-smoke.yml
@@ -94,11 +97,18 @@ function assert(name, cond, detail) {
   }
 }
 
-async function runPass(label, fn) {
+async function runPass(label, initScript, assertFn) {
   console.log(label);
   const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
   try {
-    await fn(browser);
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    if (initScript) await ctx.addInitScript(initScript);
+    const page = await ctx.newPage();
+    await page.goto(URL, { waitUntil: "load", timeout: 30000 });
+    // checkWebGPU() is async; give its promise a moment to resolve.
+    await page.waitForTimeout(1500);
+    const i = await probe(page);
+    assertFn(i);
   } finally {
     await browser.close();
   }
@@ -107,37 +117,51 @@ async function runPass(label, fn) {
 (async () => {
   const srv = await startServer();
   try {
-    // Pass A: real headless environment (no usable WebGPU adapter).
-    // The banner must toggle ON and gate the load UI.
-    await runPass("Pass A: headless (no adapter) -> banner toggles ON", async (browser) => {
-      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-      const page = await ctx.newPage();
-      await page.goto(URL, { waitUntil: "load", timeout: 30000 });
-      // Give the async checkWebGPU() promise a moment to resolve.
-      await page.waitForTimeout(2500);
-      const i = await probe(page);
-      assert("banner element present", i.bannerExists === true);
-      assert("#webgpuBanner[hidden] === false (toggled ON)", i.bannerHidden === false, "hidden=" + i.bannerHidden);
-      assert("banner computed display: block", i.bannerDisplay === "block", "display=" + i.bannerDisplay);
-      assert(
-        "reason chip is no-adapter or no-webgpu-api",
-        i.reason === "no-adapter" || i.reason === "no-webgpu-api",
-        "reason=" + i.reason
-      );
-      assert("loadBtn disabled", i.loadBtnDisabled === true, "disabled=" + i.loadBtnDisabled);
-      assert("headLoadBtn disabled", i.headLoadBtnDisabled === true, "disabled=" + i.headLoadBtnDisabled);
-      assert("loadBtn tooltip set", /WebGPU is unavailable/.test(i.loadBtnTitle || ""), "title=" + i.loadBtnTitle);
-      assert("placeholder actionable", /WebGPU is not available/.test(i.textareaPlaceholder || ""), "placeholder=" + i.textareaPlaceholder);
-      assert("status error set", /WebGPU|adapter/i.test(i.statusText || ""), "status=" + i.statusText);
-      assert("body background #09090b", i.bodyBg === "rgb(9, 9, 11)", "bg=" + i.bodyBg);
-    });
+    // A0: navigator.gpu absent -> no-webgpu-api branch.
+    await runPass(
+      "Pass A0: navigator.gpu absent -> banner ON, reason=no-webgpu-api",
+      () => {
+        // Remove navigator.gpu so the "gpu" in navigator check fails.
+        Object.defineProperty(navigator, "gpu", { value: undefined, configurable: true });
+      },
+      (i) => {
+        assert("banner element present", i.bannerExists === true);
+        assert("#webgpuBanner[hidden] === false (toggled ON)", i.bannerHidden === false, "hidden=" + i.bannerHidden);
+        assert("banner computed display: block", i.bannerDisplay === "block", "display=" + i.bannerDisplay);
+        assert("reason chip no-webgpu-api", i.reason === "no-webgpu-api", "reason=" + i.reason);
+        assert("loadBtn disabled", i.loadBtnDisabled === true, "disabled=" + i.loadBtnDisabled);
+        assert("headLoadBtn disabled", i.headLoadBtnDisabled === true, "disabled=" + i.headLoadBtnDisabled);
+        assert("loadBtn tooltip set", /WebGPU is unavailable/.test(i.loadBtnTitle || ""), "title=" + i.loadBtnTitle);
+        assert("placeholder actionable", /WebGPU is not available/.test(i.textareaPlaceholder || ""), "placeholder=" + i.textareaPlaceholder);
+        assert("status error set", /WebGPU|adapter/i.test(i.statusText || ""), "status=" + i.statusText);
+        assert("body background #09090b", i.bodyBg === "rgb(9, 9, 11)", "bg=" + i.bodyBg);
+      }
+    );
 
-    // Pass B: stubbed working adapter (proxy for a real GPU browser).
-    // The banner must stay OFF and the existing load flow must be reachable.
-    await runPass("Pass B: stubbed adapter -> banner toggles OFF (no regression)", async (browser) => {
-      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-      // Inject a working navigator.gpu before any page scripts run.
-      await ctx.addInitScript(() => {
+    // A1: navigator.gpu present but requestAdapter() resolves null -> no-adapter branch.
+    await runPass(
+      "Pass A1: requestAdapter() -> null -> banner ON, reason=no-adapter",
+      () => {
+        if (!navigator.gpu) {
+          Object.defineProperty(navigator, "gpu", { value: {}, configurable: true });
+        }
+        navigator.gpu.requestAdapter = async () => null;
+      },
+      (i) => {
+        assert("#webgpuBanner[hidden] === false (toggled ON)", i.bannerHidden === false, "hidden=" + i.bannerHidden);
+        assert("banner computed display: block", i.bannerDisplay === "block", "display=" + i.bannerDisplay);
+        assert("reason chip no-adapter", i.reason === "no-adapter", "reason=" + i.reason);
+        assert("loadBtn disabled", i.loadBtnDisabled === true, "disabled=" + i.loadBtnDisabled);
+        assert("headLoadBtn disabled", i.headLoadBtnDisabled === true, "disabled=" + i.headLoadBtnDisabled);
+        assert("placeholder actionable", /WebGPU is not available/.test(i.textareaPlaceholder || ""), "placeholder=" + i.textareaPlaceholder);
+        assert("body background #09090b", i.bodyBg === "rgb(9, 9, 11)", "bg=" + i.bodyBg);
+      }
+    );
+
+    // B: navigator.gpu present, requestAdapter() resolves a fake adapter -> banner OFF.
+    await runPass(
+      "Pass B: requestAdapter() -> adapter -> banner OFF (no regression)",
+      () => {
         if (!navigator.gpu) {
           Object.defineProperty(navigator, "gpu", { value: {}, configurable: true });
         }
@@ -146,20 +170,18 @@ async function runPass(label, fn) {
           info: {},
           limits: {},
         });
-      });
-      const page = await ctx.newPage();
-      await page.goto(URL, { waitUntil: "load", timeout: 30000 });
-      await page.waitForTimeout(2500);
-      const i = await probe(page);
-      assert("#webgpuBanner[hidden] === true (toggled OFF)", i.bannerHidden === true, "hidden=" + i.bannerHidden);
-      assert("banner computed display: none", i.bannerDisplay === "none", "display=" + i.bannerDisplay);
-      assert("loadBtn enabled", i.loadBtnDisabled === false, "disabled=" + i.loadBtnDisabled);
-      assert("headLoadBtn enabled", i.headLoadBtnDisabled === false, "disabled=" + i.headLoadBtnDisabled);
-      assert("loadBtn tooltip empty", i.loadBtnTitle === "", "title=" + i.loadBtnTitle);
-      assert("placeholder original", i.textareaPlaceholder === "Load the model to start chatting...", "placeholder=" + i.textareaPlaceholder);
-      assert("status not error", /WebGPU|adapter/i.test(i.statusText || "") === false, "status=" + i.statusText);
-      assert("body background #09090b", i.bodyBg === "rgb(9, 9, 11)", "bg=" + i.bodyBg);
-    });
+      },
+      (i) => {
+        assert("#webgpuBanner[hidden] === true (toggled OFF)", i.bannerHidden === true, "hidden=" + i.bannerHidden);
+        assert("banner computed display: none", i.bannerDisplay === "none", "display=" + i.bannerDisplay);
+        assert("loadBtn enabled", i.loadBtnDisabled === false, "disabled=" + i.loadBtnDisabled);
+        assert("headLoadBtn enabled", i.headLoadBtnDisabled === false, "disabled=" + i.headLoadBtnDisabled);
+        assert("loadBtn tooltip empty", i.loadBtnTitle === "", "title=" + i.loadBtnTitle);
+        assert("placeholder original", i.textareaPlaceholder === "Load the model to start chatting...", "placeholder=" + i.textareaPlaceholder);
+        assert("status not error", /WebGPU|adapter/i.test(i.statusText || "") === false, "status=" + i.statusText);
+        assert("body background #09090b", i.bodyBg === "rgb(9, 9, 11)", "bg=" + i.bodyBg);
+      }
+    );
   } finally {
     srv.close();
   }
