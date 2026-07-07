@@ -1,0 +1,35 @@
+ThoxWebby — Thox.ai LLC — 2026
+==============================
+
+This project ("ThoxWebby") is a rebrand + THOX product integration of the
+upstream Space `webml-community/gemma-4-webgpu-kernels`, which uses model weights
+from `google/gemma-4-E2B-it-qat-mobile-transformers`.
+
+Component-level licensing
+-------------------------
+
+1. Model weights (Gemma 4 E2B QAT Mobile Transformers) are published by Google
+   and governed by the Gemma license as stated on the upstream model card:
+   https://huggingface.co/google/gemma-4-E2B-it-qat-mobile-transformers
+
+2. WebGPU compute kernels and the pre-compiled inference bundle
+   (`gemma-4-e2b.js`) originate from the upstream Space
+   `webml-community/gemma-4-webgpu-kernels`. Attribution to the original authors
+   (Fable 5, xenova / webml-community) is preserved as-is.
+
+3. THOX-authored files in this repository — the rebranded `index.html`, this
+   `LICENSE`, the `README.md`, the THOX system prompt, THOX color tokens, and
+   THOX product wiring — are Copyright (c) 2026 Thox.ai LLC and are provided
+   AS-IS, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+   LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+   PURPOSE, AND NONINFRINGEMENT.
+
+Independence
+------------
+
+THOX is an independent AI company. This project is NOT affiliated with,
+endorsed by, or sponsored by Google, Meta, Alibaba, Anthropic, OpenAI, Mistral,
+or Qwen. It applies THOX branding, THOX house voice, and THOX product wiring to
+an open-source model released by Google.
+
+Your AI. Your Data. Your Rules.
