@@ -468,6 +468,98 @@
   .head-btn.solid { background: #fff; color: #000; border-color: #fff; }
   .head-btn.solid:hover:not(:disabled) { opacity: 0.85; color: #000; }
 
+    /* WebGPU-unavailable banner - shown above the chat thread when no usable
+       GPU adapter is detected on page load (no-webgpu-api / no-adapter / error). */
+    #webgpuBanner { display: none; }
+    #webgpuBanner.show { display: block; }
+    .webgpu-banner {
+      margin: 0 auto;
+      max-width: var(--maxw);
+      padding: 16px 28px;
+      border-bottom: 1px solid var(--line-soft);
+      background: rgba(239, 68, 68, 0.06);
+    }
+    .webgpu-banner-inner {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 14px 16px;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      border-radius: 12px;
+      background: rgba(24, 24, 27, 0.7);
+    }
+    .webgpu-banner-icon {
+      flex: 0 0 auto;
+      width: 20px; height: 20px;
+      color: var(--danger);
+      margin-top: 1px;
+    }
+    .webgpu-banner-body { min-width: 0; }
+    .webgpu-banner-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+    .webgpu-banner-title {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--danger);
+      font-weight: 600;
+    }
+    .webgpu-banner-reason {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--t3);
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      border-radius: 100px;
+      white-space: nowrap;
+    }
+    .webgpu-banner-pitch {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--t2);
+      margin: 0 0 10px;
+    }
+    .webgpu-banner-pitch b { color: var(--t1); font-weight: 600; }
+    .webgpu-banner-checklist {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .webgpu-banner-checklist li {
+      position: relative;
+      padding-left: 20px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--t3);
+    }
+    .webgpu-banner-checklist li::before {
+      content: "";
+      position: absolute;
+      left: 4px; top: 7px;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--brand-primary);
+    }
+    .webgpu-banner-checklist code {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--t2);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
   /* Absolutely positioned over the header's bottom edge so it can never affect layout —
      no element shifts when loading starts or ends; the fill just fades out on completion. */
   .bar {
@@ -1061,6 +1153,25 @@
       <div class="bar" id="bar"><div></div></div>
     </header>
 
+    <div id="webgpuBanner" class="webgpu-banner" role="alert" aria-live="polite" hidden>
+      <div class="webgpu-banner-inner">
+        <svg class="webgpu-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <div class="webgpu-banner-body">
+          <div class="webgpu-banner-head">
+            <span class="webgpu-banner-title">WebGPU not available</span>
+            <span class="webgpu-banner-reason" id="webgpuReason">no-webgpu-api</span>
+          </div>
+          <p class="webgpu-banner-pitch">ThoxWebby runs entirely in your browser via WebGPU - no servers, no data leaves your machine. A usable WebGPU adapter is required to load the on-device model.</p>
+          <ul class="webgpu-banner-checklist">
+            <li>Use <b>Chrome 113+</b>, <b>Edge 113+</b>, or <b>Safari 18+</b> with hardware acceleration enabled.</li>
+            <li>Check <code>chrome://gpu</code> (or <code>edge://gpu</code>) and confirm WebGPU shows Hardware accelerated.</li>
+            <li>Some corporate policies or extensions disable WebGPU - try an unmanaged profile or disable the extension.</li>
+            <li>Headless or software-only runtimes often return <code>no-adapter</code>; run in a real desktop GPU session.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
     <div class="thread-scroll" id="threadScroll">
       <div class="thread" id="thread">
         <div class="welcome" id="welcome">
@@ -1207,63 +1318,56 @@
     let shownProgress = 0;  // currently rendered bar fraction (eased toward target each frame)
     let progressRaf = 0;
 
+    // Proactively detect WebGPU on page load: navigator.gpu must exist AND
+    // requestAdapter() must return a usable adapter. If either fails we surface a
+    // graceful, actionable banner above the chat panel and gate the load buttons
+    // with a tooltip explaining why - so visitors never see a silently disabled UI.
+    const WEBGPU_TOOLTIP =
+      "WebGPU is unavailable in this browser, so the on-device model cannot load. See the banner above for how to enable WebGPU.";
+    function showWebGPUUnavailable(reason, detail) {
+      const banner = $("webgpuBanner");
+      const reasonEl = $("webgpuReason");
+      if (banner) { banner.hidden = false; banner.classList.add("show"); }
+      if (reasonEl) reasonEl.textContent = reason;
+      loadBtn.disabled = true;
+      headLoadBtn.disabled = true;
+      loadBtn.setAttribute("aria-disabled", "true");
+      headLoadBtn.setAttribute("aria-disabled", "true");
+      loadBtn.title = WEBGPU_TOOLTIP;
+      headLoadBtn.title = WEBGPU_TOOLTIP;
+      const actionable =
+        "WebGPU is not available in this browser. ThoxWebby requires a WebGPU-enabled browser (Chrome 113+, Edge 113+, Safari 18+).";
+      input.placeholder = actionable;
+      input.disabled = true;
+      setStatus("error", detail || actionable);
+    }
+
     async function checkWebGPU() {
-      if (!navigator.gpu) return { available: false, reason: "no-webgpu-api" };
+      // Reason codes: "no-webgpu-api" | "no-adapter" | "error"
+      if (!("gpu" in navigator) || !navigator.gpu) {
+        showWebGPUUnavailable("no-webgpu-api");
+        return false;
+      }
       try {
         const adapter = await navigator.gpu.requestAdapter();
-        if (!adapter) return { available: false, reason: "no-adapter" };
-        return { available: true };
-      } catch (e) {
-        return { available: false, reason: "error", error: String(e) };
-      }
-    }
-
-    function applyWebGPUUnavailable(reason) {
-      const placeholder = reason === "no-webgpu-api"
-        ? "WebGPU is not available in this browser. ThoxWebby requires a WebGPU-enabled browser (Chrome 113+, Edge 113+, Safari 18+)."
-        : "WebGPU is available but no GPU adapter was found. If you are on a supported browser, check chrome://gpu — the model runs entirely on-device via WebGPU.";
-      input.placeholder = placeholder;
-
-      const tip = "ThoxWebby needs WebGPU to run entirely on-device with no server. See help below.";
-      loadBtn.disabled = true;
-      loadBtn.setAttribute("title", tip);
-      if (loadBtnLabel) loadBtnLabel.textContent = "WebGPU unavailable";
-      headLoadBtn.disabled = true;
-      headLoadBtn.textContent = "WebGPU unavailable";
-      headLoadBtn.setAttribute("title", tip);
-
-      const statusMsg = reason === "no-webgpu-api"
-        ? "WebGPU isn't available here. Try a recent Chrome, Edge, or Safari Technology Preview."
-        : "WebGPU is present but no adapter is available. Check chrome://gpu.";
-      setStatus("error", statusMsg);
-
-      if (!document.querySelector(".webgpu-banner")) {
-        const banner = document.createElement("div");
-        banner.className = "webgpu-banner";
-        banner.setAttribute("role", "alert");
-        banner.style.cssText = "background:#3f3f46;color:#fafafa;padding:1rem 1.25rem;border-left:3px solid #ef4444;margin:1rem 1.5rem;font-family:inherit;font-size:0.9rem;border-radius:4px;max-width:960px;";
-        banner.innerHTML =
-          '<strong style="color:#fca5a5;">WebGPU not available</strong><br/>' +
-          'ThoxWebby runs entirely in your browser via WebGPU — no servers, no data leaves your machine.' +
-          '<ul style="margin:0.5rem 0 0 1.25rem;line-height:1.6;">' +
-          '<li>Use Chrome 113+, Edge 113+, or Safari 18+</li>' +
-          '<li>Check <code style="background:#18181b;padding:0.1rem 0.3rem;border-radius:2px;">chrome://gpu</code> to confirm WebGPU is enabled</li>' +
-          '<li>Some corporate policies disable WebGPU — ask IT</li>' +
-          '</ul>' +
-          '<div style="margin-top:0.75rem;opacity:0.8;font-size:0.8rem;">Detected: <code style="background:#18181b;padding:0.1rem 0.3rem;border-radius:2px;">' + reason + '</code></div>';
-        const chatHeader = chat.querySelector("header");
-        if (chatHeader && chatHeader.nextSibling) {
-          chat.insertBefore(banner, chatHeader.nextSibling);
-        } else {
-          chat.insertBefore(banner, chat.firstChild);
+        if (!adapter) {
+          showWebGPUUnavailable(
+            "no-adapter",
+            "No WebGPU adapter. Load model is disabled until a usable GPU adapter is available."
+          );
+          return false;
         }
+        return true;
+      } catch (error) {
+        showWebGPUUnavailable(
+          "error",
+          "WebGPU adapter request failed: " + escapeHtml(String(error?.message ?? error))
+        );
+        return false;
       }
     }
 
-    (async () => {
-      const gpu = await checkWebGPU();
-      if (!gpu.available) applyWebGPUUnavailable(gpu.reason);
-    })();
+    checkWebGPU();
 
     loadBtn.addEventListener("click", loadModel);
     headLoadBtn.addEventListener("click", loadModel);
