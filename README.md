@@ -1,5 +1,5 @@
 ---
-title: ThoxWebby
+title: ThoxWeb
 emoji: 🟢
 colorFrom: green
 colorTo: gray
@@ -10,7 +10,7 @@ license: other
 tags:
 - thox-ai
 - thoxkey
-- thoxwebby
+- ThoxWeb
 - webgpu
 - browser
 - local-first
@@ -18,28 +18,28 @@ tags:
 - qat
 models:
 - google/gemma-4-E2B-it-qat-mobile-transformers
-- Thox-ai/ThoxWebby-Gemma-4-E2B
+- Thox-ai/ThoxWeb-Gemma-4-E2B
 ---
 
-# ThoxWebby
+# ThoxWeb
 
 **In-browser THOX assistant. WebGPU. No servers. No telemetry. Local-first.**
 
-ThoxWebby is the browser-native chat surface for the **ThoxKey** product from **Thox.ai LLC**.
+ThoxWeb is the browser-native chat surface for the **ThoxKey** product from **Thox.ai LLC**.
 It runs Google's Gemma 4 E2B (QAT Mobile) entirely on the user's device via WebGPU — the model,
 the tokenizer, and every compute kernel execute inside the browser. Nothing you type leaves
 your machine.
 
-- Live Space: https://huggingface.co/spaces/Thox-ai/ThoxWebby
+- Live Space: https://huggingface.co/spaces/Thox-ai/ThoxWeb
 - Source: https://github.com/ttracx/thox-webby
 - Product page: https://thox.ai/thoxkey
-- Model mirror: https://huggingface.co/Thox-ai/ThoxWebby-Gemma-4-E2B
+- Model mirror: https://huggingface.co/Thox-ai/ThoxWeb-Gemma-4-E2B
 
 ## How it works
 
 1. Plug your **ThoxKey** into any modern browser (Chrome, Edge, or another WebGPU-capable
    browser).
-2. The ThoxKey landing page loads ThoxWebby.
+2. The ThoxKey landing page loads ThoxWeb.
 3. The Gemma 4 E2B (QAT Mobile) weights are downloaded once, cached locally, then executed
    entirely on-device with WebGPU compute shaders.
 4. No servers. No telemetry. No account required.
@@ -49,7 +49,7 @@ your machine.
 This build is a rebrand-and-configuration wrap of Google's
 [`google/gemma-4-E2B-it-qat-mobile-transformers`](https://huggingface.co/google/gemma-4-E2B-it-qat-mobile-transformers).
 The THOX-branded model repo at
-[`Thox-ai/ThoxWebby-Gemma-4-E2B`](https://huggingface.co/Thox-ai/ThoxWebby-Gemma-4-E2B) mirrors
+[`Thox-ai/ThoxWeb-Gemma-4-E2B`](https://huggingface.co/Thox-ai/ThoxWeb-Gemma-4-E2B) mirrors
 the base for THOX use. Weights themselves are pulled from the upstream Google repo until the
 THOX-hosted weights ship.
 
