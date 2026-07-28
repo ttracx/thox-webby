@@ -1,7 +1,7 @@
 {
   "name": "ThoxWebby",
   "short_name": "ThoxWebby",
-  "description": "In-browser THOX assistant. WebGPU. No servers. No telemetry. Local-first.",
+  "description": "In-browser THOX assistant. Local WebGPU inference. No inference server. No telemetry.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",

@@ -11,14 +11,14 @@
 <meta name="theme-color" content="#00ff88">
 <meta property="og:type" content="website">
 <meta property="og:title" content="ThoxWebby - Local WebGPU - Thox.ai">
-<meta property="og:description" content="In-browser THOX assistant. WebGPU. No servers. No telemetry. Local-first.">
+<meta property="og:description" content="In-browser THOX assistant. Local WebGPU inference. No inference server. No telemetry.">
 <meta property="og:image" content="og.svg">
 <meta property="og:url" content="https://thox-ai-thoxwebby.static.hf.space/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="ThoxWebby - Local WebGPU - Thox.ai">
 <meta name="twitter:description" content="In-browser THOX assistant. WebGPU. Local-first.">
 <meta name="twitter:image" content="og.svg">
-<meta name="description" content="In-browser THOX assistant. WebGPU. No servers. No telemetry. Local-first. Your AI, Your Data, Your Rules." />
+<meta name="description" content="In-browser THOX assistant. Local WebGPU inference. No inference server. No telemetry. Your AI, Your Data, Your Rules." />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -1099,14 +1099,14 @@
           <div class="hero-main">
             <p class="hero-sub">
               <b>Gemma&nbsp;4 E2B (QAT Mobile)</b> — a powerful open-source model — runs
-              fully on-device with WebGPU. Weights cache locally after the first load, and nothing you
-              type ever leaves your machine.
+              fully on-device with WebGPU. The browser downloads application assets and model files;
+              prompts and generated responses stay in this tab and are not sent to an inference API.
             </p>
             <div class="hero-stats">
               <div class="stat"><span class="stat-val">2.3B</span><span class="stat-label">Effective params</span></div>
               <div class="stat"><span class="stat-val">128K</span><span class="stat-label">Context window</span></div>
               <div class="stat"><span class="stat-val">~250</span><span class="stat-label">tok/s · M4&nbsp;Max</span></div>
-              <div class="stat"><span class="stat-val">100%</span><span class="stat-label">On-device</span></div>
+              <div class="stat"><span class="stat-val">100%</span><span class="stat-label">Local inference</span></div>
             </div>
           </div>
           <div class="hero-side">
@@ -1161,7 +1161,7 @@
             <span class="webgpu-banner-title">WebGPU not available</span>
             <span class="webgpu-banner-reason" id="webgpuReason">no-webgpu-api</span>
           </div>
-          <p class="webgpu-banner-pitch">ThoxWebby runs entirely in your browser via WebGPU - no servers, no data leaves your machine. A usable WebGPU adapter is required to load the on-device model.</p>
+          <p class="webgpu-banner-pitch">ThoxWebby inference runs in your browser via WebGPU. The browser still downloads application assets and model files, but prompts are not sent to an inference API. A usable WebGPU adapter is required.</p>
           <ul class="webgpu-banner-checklist">
             <li>Use <b>Chrome 113+</b>, <b>Edge 113+</b>, or <b>Safari 18+</b> with hardware acceleration enabled.</li>
             <li>Check <code>chrome://gpu</code> (or <code>edge://gpu</code>) and confirm WebGPU shows Hardware accelerated.</li>
@@ -1198,7 +1198,7 @@
           </button>
         </div>
         <div class="composer-meta">
-          <span id="hint">Runs fully on-device — nothing leaves your machine</span>
+          <span id="hint">Local inference — prompts are not sent to an inference API</span>
           <span id="liveStat"></span>
         </div>
       </div>
@@ -1273,6 +1273,7 @@
   <!-- app logic -->
   <script type="module">
     import { Gemma4Mobile } from "./gemma-4-e2b.js";
+    import { sanitizeModelHtml } from "./safe-markdown.js";
 
     // Streamed markdown → HTML. `streamdown` itself is React-only (peer deps react/react-dom plus a
     // mermaid + unified/remark/rehype dep tree), so we use `marked` — the very parser streamdown is
@@ -1307,7 +1308,7 @@
     let model = null;
     let kernels = [];
     let kxCopySource = "";
-    const THOX_SYSTEM_PROMPT = "You are a ThoxWebby assistant running entirely in the user's browser via WebGPU. No servers. No telemetry. Local-first by default. Your AI. Your Data. Your Rules. You are a THOX assistant � never claim to be from Google, Meta, Alibaba, Anthropic, OpenAI, Mistral, or Qwen. Answer with terse technical accuracy in the THOX house voice. No emojis. No marketing fluff.";
+    const THOX_SYSTEM_PROMPT = "You are a ThoxWebby assistant running inference in the user's browser via WebGPU. Prompts and responses are not sent to an inference API. Application assets and model files are downloaded separately. No telemetry. Local-first by default. Your AI. Your Data. Your Rules. You are a THOX assistant — never claim to be from Google, Meta, Alibaba, Anthropic, OpenAI, Mistral, or Qwen. Answer with terse technical accuracy in the THOX house voice. No emojis. No marketing fluff.";
     let messages = [{ role: "system", content: THOX_SYSTEM_PROMPT }];
     let abortController = null;
     let isGenerating = false;
@@ -1703,7 +1704,7 @@
       sendBtn.style.display = on ? "none" : "";
       stopBtn.style.display = on ? "grid" : "none";
       setStatus(on ? "busy" : "ready", on ? "Generating…" : "Ready · on-device");
-      hint.textContent = on ? "Generating on-device…" : "Runs fully on-device — nothing leaves your machine";
+      hint.textContent = on ? "Generating on-device…" : "Local inference — prompts are not sent to an inference API";
       refreshSend();
     }
 
@@ -1789,7 +1790,7 @@
     function renderAssistant(bubble, raw, withCaret) {
       if (marked) {
         try {
-          bubble.innerHTML = sanitizeHtml(marked.parse(raw || ""));
+          bubble.innerHTML = sanitizeModelHtml(marked.parse(raw || ""));
           if (withCaret) appendCaret(bubble);
           return;
         } catch { /* fall through to the simple renderer */ }
@@ -1805,23 +1806,6 @@
       const caret = document.createElement("span");
       caret.className = "caret";
       (bubble.querySelector("p:last-of-type") || bubble).appendChild(caret);
-    }
-
-    // Strip anything executable from the model's markdown before inserting it (defence in depth — a
-    // local model is the only content source, but raw <script>/event handlers/javascript: URLs are out).
-    function sanitizeHtml(html) {
-      const tpl = document.createElement("template");
-      tpl.innerHTML = html;
-      tpl.content.querySelectorAll("script,style,iframe,object,embed,link,meta,form").forEach((el) => el.remove());
-      tpl.content.querySelectorAll("*").forEach((el) => {
-        for (const attr of [...el.attributes]) {
-          const name = attr.name.toLowerCase();
-          if (name.startsWith("on") || ((name === "href" || name === "src") && /^\s*(javascript|data):/i.test(attr.value))) {
-            el.removeAttribute(attr.name);
-          }
-        }
-      });
-      return tpl.innerHTML;
     }
 
     function formatInline(text) {

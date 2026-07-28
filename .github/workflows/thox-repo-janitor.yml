@@ -9,7 +9,9 @@ permissions:
   pull-requests: write
 jobs:
   janitor:
-    uses: ttracx/thox-repo-janitor/.github/workflows/reusable-janitor.yml@main
+    # Pin the reusable workflow because this job forwards repository and provider
+    # secrets. Review and update the SHA explicitly when adopting janitor changes.
+    uses: ttracx/thox-repo-janitor/.github/workflows/reusable-janitor.yml@372a48107029172cb28ca5f1f4baf658a282449a
     secrets:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       OLLAMA_HOST: ${{ secrets.OLLAMA_HOST }}

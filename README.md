@@ -23,12 +23,12 @@ models:
 
 # THOXYweb
 
-**In-browser THOX assistant. WebGPU. No servers. No telemetry. Local-first.**
+**In-browser THOX assistant. Local WebGPU inference. No inference server. No telemetry.**
 
 THOXYweb is the browser-native chat surface for the **ThoxKey** product from **Thox.ai LLC**.
 It runs Google's Gemma 4 E2B (QAT Mobile) entirely on the user's device via WebGPU — the model,
-the tokenizer, and every compute kernel execute inside the browser. Nothing you type leaves
-your machine.
+the tokenizer, and every compute kernel execute inside the browser. Prompts and generated
+responses are not sent to an inference API.
 
 - Live Space: https://huggingface.co/spaces/Thox-ai/THOXYweb
 - Source: https://github.com/ttracx/thox-webby
@@ -42,7 +42,23 @@ your machine.
 2. The ThoxKey landing page loads THOXYweb.
 3. The Gemma 4 E2B (QAT Mobile) weights are downloaded once, cached locally, then executed
    entirely on-device with WebGPU compute shaders.
-4. No servers. No telemetry. No account required.
+4. Inference stays local. No telemetry or account is required.
+
+## Local-first boundary
+
+THOXYweb is **local-inference**, not fully offline on first use:
+
+- The page loads fonts and UI/runtime modules from Google Fonts, jsDelivr, and esm.sh.
+- Clicking **Load model** downloads tokenizer/configuration and model weights from Hugging Face.
+- The browser may cache those resources, subject to its storage and eviction policy.
+- Prompt text and generated responses remain in page memory and are not submitted to an
+  inference service.
+- Model-generated markdown is rendered through an allowlist. Media/embed elements are removed
+  so a generated response cannot silently trigger a remote image or media request.
+
+For an air-gapped/offline release, vendor every runtime asset and model file, add an explicit
+content-security policy, and validate from a clean host with the network disabled. That proof is
+not part of the current release.
 
 ## Model
 
