@@ -32,3 +32,17 @@
 - **Tradeoff:** janitor updates are manual.
 - **Final choice:** pin `ttracx/thox-repo-janitor` at
   `372a48107029172cb28ca5f1f4baf658a282449a`.
+
+## ADR-004: Keep reusable-workflow secret contracts exact
+
+- **Decision:** forward only secret names declared by the pinned reusable workflow.
+- **Context:** scheduled runs `30524262188` and `30433510395` failed before creating a job
+  because the caller supplied `FIREWORKS_API_KEY`, which the pinned workflow does not declare.
+- **Security impact:** removes an unused provider-secret forwarding path and preserves least
+  privilege.
+- **Tradeoff:** adding a provider later requires a reviewed change to both the reusable workflow
+  contract and this caller.
+- **Final choice:** remove the undeclared secret and validate the caller against the pinned
+  `workflow_call` contract.
+- **Follow-up:** confirm that the replacement run creates a job; this change alone does not prove
+  janitor behavior or release readiness.

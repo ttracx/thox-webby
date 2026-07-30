@@ -15,7 +15,6 @@ jobs:
     secrets:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       OLLAMA_HOST: ${{ secrets.OLLAMA_HOST }}
-      FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
