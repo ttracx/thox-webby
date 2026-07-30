@@ -44,7 +44,8 @@
   access disabled.
 - **Tradeoff:** fleet-wide mutation and issue automation stay centralized in the private janitor
   repository; this workflow only proves the Webby smoke contract.
-- **Final choice:** replace the unusable cross-repository call with `npm ci` and `npm test` on a
-  scheduled or manual Ubuntu runner.
+- **Final choice:** replace the unusable cross-repository call with `npm ci`, installation of the
+  lockfile-pinned Playwright Chromium runtime, and `npm test` on a scheduled or manual Ubuntu
+  runner. Run `30545432073` proved the browser install is required on a clean runner.
 - **Follow-up:** confirm the replacement run; it does not establish clean-host GPU, offline, or
   release readiness.
