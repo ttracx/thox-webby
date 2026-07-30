@@ -33,16 +33,18 @@
 - **Final choice:** pin `ttracx/thox-repo-janitor` at
   `372a48107029172cb28ca5f1f4baf658a282449a`.
 
-## ADR-004: Keep reusable-workflow secret contracts exact
+## ADR-004: Keep public-repository maintenance self-contained
 
-- **Decision:** forward only secret names declared by the pinned reusable workflow.
-- **Context:** scheduled runs `30524262188` and `30433510395` failed before creating a job
-  because the caller supplied `FIREWORKS_API_KEY`, which the pinned workflow does not declare.
-- **Security impact:** removes an unused provider-secret forwarding path and preserves least
-  privilege.
-- **Tradeoff:** adding a provider later requires a reviewed change to both the reusable workflow
-  contract and this caller.
-- **Final choice:** remove the undeclared secret and validate the caller against the pinned
-  `workflow_call` contract.
-- **Follow-up:** confirm that the replacement run creates a job; this change alone does not prove
-  janitor behavior or release readiness.
+- **Decision:** run this public repository's scheduled smoke check locally in its own workflow.
+- **Context:** scheduled runs `30524262188` and `30433510395` failed before creating a job.
+  Removing an undeclared secret exposed the remaining GitHub boundary: a public repository cannot
+  call the private janitor workflow at its pinned SHA.
+- **Security impact:** the replacement uses read-only contents permission and forwards no
+  repository or provider secrets. The private janitor repository remains private with reusable
+  access disabled.
+- **Tradeoff:** fleet-wide mutation and issue automation stay centralized in the private janitor
+  repository; this workflow only proves the Webby smoke contract.
+- **Final choice:** replace the unusable cross-repository call with `npm ci` and `npm test` on a
+  scheduled or manual Ubuntu runner.
+- **Follow-up:** confirm the replacement run; it does not establish clean-host GPU, offline, or
+  release readiness.

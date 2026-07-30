@@ -1,20 +1,19 @@
-name: thox-repo-janitor
+name: THOX Webby maintenance
 on:
   schedule:
     - cron: '0 7 * * *'
   workflow_dispatch: {}
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+  contents: read
 jobs:
-  janitor:
-    # Pin the reusable workflow because this job forwards repository and provider
-    # secrets. Review and update the SHA explicitly when adopting janitor changes.
-    uses: ttracx/thox-repo-janitor/.github/workflows/reusable-janitor.yml@372a48107029172cb28ca5f1f4baf658a282449a
-    secrets:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      OLLAMA_HOST: ${{ secrets.OLLAMA_HOST }}
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
-      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm test
