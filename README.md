@@ -23,6 +23,10 @@ models:
 
 # THOXYweb
 
+![License](https://img.shields.io/badge/license-See%20LICENSE-lightgrey.svg)
+![THOX.ai](https://img.shields.io/badge/THOX.ai-LLC-red.svg)
+![Repository](https://img.shields.io/badge/repository-ttracx%2Fthox--webby-0B1220)
+
 **In-browser THOX assistant. Local WebGPU inference. No inference server. No telemetry.**
 
 THOXYweb is the browser-native chat surface for the **ThoxKey** product from **Thox.ai LLC**.
@@ -89,3 +93,17 @@ THOX-hosted weights ship.
   warranty, express or implied.
 
 _Your AI. Your Data. Your Rules._
+
+---
+
+## Legal
+
+Copyright (c) 2024-2026 THOX.ai LLC. All rights reserved.
+
+**THOX.ai LLC**
+- CTO: Tommy Xaypanya
+- CEO: Craig Ross
+
+See [LICENSE](LICENSE) for license terms.
+
+Unauthorized copying, modification, merger, publication, distribution, sublicensing, and/or selling of this software, via any medium, is strictly prohibited without prior written consent from THOX.ai LLC.
